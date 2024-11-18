@@ -12,9 +12,14 @@ def const(x, c):
     return c
 
 def get_data(skiprows : int) -> list[int]:
-    with open('single.txt', 'r') as f:
-        data = np.loadtxt(f, dtype = str, usecols = 0, max_rows = 1000, delimiter=',', skiprows = skiprows)
-        data = [int(i) for i in data]                            
+    with open('run.txt', 'r') as f:
+        data = np.loadtxt(f, dtype = str, usecols = 0, max_rows = 2*1000, delimiter=',', skiprows = 2*skiprows)
+        data1 = [int(i) for i in data[::2]]   
+        data2 = [int(i) for i in data[1::2]]
+        try:
+            data = [data1[i]*256 + data2[i] for i in range(len(data1))]
+        except:
+            data = []
     return data
 
 
@@ -31,9 +36,9 @@ def update_hist(frame):
         return
     full_data.extend(data)
     skiprows_next += 1000
-    x = np.linspace(0, np.max(full_data)+1, 128)
+    x = np.linspace(0, 300, 300)
 
-    bins, edges = np.histogram(full_data, bins=128, range=(0, 128))
+    bins, edges = np.histogram(full_data, bins=300, range=(0, 300))
     popt, _ = curve_fit(const, edges[:-1], bins)
 
     total = np.sum(bins)
@@ -46,12 +51,12 @@ def update_hist(frame):
     ax.clear()
     ax.set_xlabel('bins')
     ax.set_ylabel('frequency')
-    ax.hist(full_data, bins=128, range=(0, 128), width=1, edgecolor = 'black', linewidth = .5)
-    ax.plot(x, popt[0] * np.ones(128), color='red', linestyle='-')
+    ax.hist(full_data, bins=300, range=(0, 300), width=1, edgecolor = 'black', linewidth = .5)
+    ax.plot(x, popt[0] * np.ones(300), color='red', linestyle='-')
     ax.axvline(x=np.min(full_data), ymax=(popt[0]/(np.max(bins)*1.05)), color='red', linestyle='-')
     ax.axvline(x=np.max(full_data)+1, ymax=(popt[0]/(np.max(bins)*1.05)), color='red', linestyle='-')
     ax.set_title('Frequency distribution of the bins')
-    ax.set_xlim(-2, np.max(full_data)+5)
+    ax.set_xlim(-2, 300)
 
 
 ani = FuncAnimation(fig, update_hist, interval=.1)
