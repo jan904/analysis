@@ -1,9 +1,75 @@
 import numpy as np
-import pandas as pd
 import matplotlib.pyplot as plt
 
+freq = 12e6
+channels = ['00', '01', '10', '11']
+timestamp = '2024-11-20_16:10:13'
+all_bins = {channel: [] for channel in channels}
+all_timestamps = {channel: [] for channel in channels}
 
-with open('single.txt', 'r') as f:
+def get_data(directory, channel) -> list[int]:
+    with open(f'./data/{directory}/{channel}.txt', 'r') as f:
+        data = np.loadtxt(f, dtype = str, usecols = 0, delimiter=',')
+        data = [int(i) for i in data]   
+    return data
+
+
+def plot_calib(dir, channels):
+    plt.figure(figsize=(12, 12))
+    for i, channel in enumerate(channels):
+        data = get_data(timestamp, channel)
+
+        vals, counts = np.unique(data, return_counts=True)
+        
+        entries = len(data)
+        bins = []
+        
+        # Last value is the overflow currentlz
+        max_bin = vals[-2]
+        
+        # Fill in missing bins with 0
+        full_range = np.arange(max_bin)
+        missing = np.setdiff1d(full_range, vals)
+        for m in missing:
+            counts = np.insert(counts, m, 0)
+    
+        for j in range(max_bin):
+            bins.append((counts[j]/entries) * 1/freq)
+
+        bins = np.array(bins) * 1e9
+        timestamps = np.cumsum(bins)
+        
+        all_bins[channel] = bins
+        all_timestamps[channel] = timestamps
+        
+        plt.subplot(2, 2, i+1)
+        plt.bar(range(max_bin), bins, width=1, edgecolor = 'black', linewidth = .5, align='edge')
+        plt.xlabel('Bins')
+        plt.ylabel('Bin width [ns]')
+        plt.title(f'Channel {int(channel, 2)}')
+        
+    plt.savefig(f'./data/{timestamp}/calibration.pdf', dpi=300)
+    plt.show()
+
+plot_calib(timestamp, channels)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""with open('single.txt', 'r') as f:
     data = np.loadtxt(f, dtype = str, usecols = 0, delimiter=',')
     data = [int(i) for i in data]
     
@@ -48,5 +114,5 @@ plt.hist(arrival_time, bins = 20, edgecolor = 'black', linewidth = .5)
 plt.xlabel('Arrival time [ns]')
 plt.ylabel('Entries')
 plt.title('Distribution of arrival times')
-plt.show()
+plt.show()"""
 
