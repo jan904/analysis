@@ -6,6 +6,7 @@ channels = ['00', '01', '10', '11']
 timestamp = '2024-11-20_16:10:13'
 all_bins = {channel: [] for channel in channels}
 all_timestamps = {channel: [] for channel in channels}
+all_data = {channel: [] for channel in channels}
 
 def get_data(directory, channel) -> list[int]:
     with open(f'./data/{directory}/{channel}.txt', 'r') as f:
@@ -17,41 +18,87 @@ def get_data(directory, channel) -> list[int]:
 def plot_calib(dir, channels):
     plt.figure(figsize=(12, 12))
     for i, channel in enumerate(channels):
+        
         data = get_data(timestamp, channel)
-
+        
         vals, counts = np.unique(data, return_counts=True)
+        max_data = vals[-2]
+        data = [int(i) if i != 288 else max_data for i in data]
         
         entries = len(data)
         bins = []
-        
-        # Last value is the overflow currentlz
-        max_bin = vals[-2]
-        
+        vals, counts = np.unique(data, return_counts=True)
+
         # Fill in missing bins with 0
-        full_range = np.arange(max_bin)
+        full_range = np.arange(max_data)
         missing = np.setdiff1d(full_range, vals)
         for m in missing:
             counts = np.insert(counts, m, 0)
     
-        for j in range(max_bin):
+        for j in range(max_data + 1):
             bins.append((counts[j]/entries) * 1/freq)
 
         bins = np.array(bins) * 1e9
         timestamps = np.cumsum(bins)
         
+        all_data[channel] = data
         all_bins[channel] = bins
         all_timestamps[channel] = timestamps
         
         plt.subplot(2, 2, i+1)
-        plt.bar(range(max_bin), bins, width=1, edgecolor = 'black', linewidth = .5, align='edge')
+        plt.bar(range(max_data+1), bins, width=1, edgecolor = 'black', linewidth = .5, align='edge')
         plt.xlabel('Bins')
         plt.ylabel('Bin width [ns]')
         plt.title(f'Channel {int(channel, 2)}')
         
     plt.savefig(f'./data/{timestamp}/calibration.pdf', dpi=300)
-    plt.show()
+    #plt.show()
+    
+    return all_data, all_bins, all_timestamps
 
-plot_calib(timestamp, channels)
+def coincidence(timestamps, data, channels):
+    
+    times = {channel: [] for channel in channels}
+    
+    lens = [len(data[channel]) for channel in channels]
+    for channel in channels:
+        data[channel] = np.array(data[channel])
+        data[channel] = data[channel][:min(lens)]
+        timestamps[channel] = np.array(timestamps[channel])
+        times[channel] = timestamps[channel][data[channel]]
+    
+    times['00'] = times['00'][1:]  
+    times['01'] = times['01'][:-1]
+    times['10'] = times['10'][:-1]
+    times['11'] = times['11'][:-1]
+      
+    mean1 = np.mean([times['00'], times['01']], axis=0)
+    mean2 = np.mean([times['10'], times['11']], axis=0)
+    
+    diff = mean1 - mean2
+    mask = diff < 0
+    diff[mask] = diff[mask] + 1/freq * 1e9
+    
+    mask = diff > 80
+    diff[mask] = diff[mask] - 1/freq * 1e9
+    
+    mask = diff < 3
+    diff = diff[mask]
+    
+    plt.figure(figsize=(12, 6))
+    plt.hist(diff, bins = 15, edgecolor = 'black', linewidth = .5)
+    plt.xlabel('Time difference [ns]')
+    plt.ylabel('Entries')
+    plt.title('Time difference between channels with mean')
+    plt.legend([f'Variance = {np.var(diff):.4f} ns'])
+    plt.savefig(f'./data/{timestamp}/coincidence_mean.pdf', dpi=300)
+    plt.show()
+    
+
+    
+
+data_, bins_, timestamps_ = plot_calib(timestamp, channels)
+coincidence(timestamps_, data_, channels)
 
 
 
