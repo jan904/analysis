@@ -7,7 +7,8 @@ from scipy.optimize import curve_fit
 
 skiprows_next : int = 0
 channels = ['00', '01', '10', '11']
-timestamp = '2024-11-19_17:25:33'
+channels = ['00','10']
+timestamp = '2024-11-22_15:53:59'
 full_data = {channel: [] for channel in channels}
 
 def get_data(skiprows : int, directory, channel) -> list[int]:

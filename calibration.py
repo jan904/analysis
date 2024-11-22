@@ -4,10 +4,11 @@ import ROOT
 
 freq = 12e6
 channels = ['00', '01', '10', '11']
-timestamp = '2024-11-20_16:10:13'
+timestamp = '2024-11-22_13:50:51'
 all_bins = {channel: [] for channel in channels}
 all_timestamps = {channel: [] for channel in channels}
 all_data = {channel: [] for channel in channels}
+all_overflow = {channel: [] for channel in channels}
 
 def get_data(directory, channel) -> list[int]:
     with open(f'./data/{directory}/{channel}.txt', 'r') as f:
@@ -17,18 +18,29 @@ def get_data(directory, channel) -> list[int]:
 
 
 def plot_calib(dir, channels):
+    
     plt.figure(figsize=(12, 12))
+    
     for i, channel in enumerate(channels):
         
-        data = get_data(timestamp, channel)
+        data = get_data(dir, channel)
+        vals = np.unique(data)
+        max_data = vals[-1]
+
+        all_data[channel] = data
+        all_overflow[channel] = np.where(np.array(data) == max_data)[0]
         
-        vals, counts = np.unique(data, return_counts=True)
-        max_data = vals[-2]
-        data = [int(i) if i != 288 else max_data for i in data]
+    overflow = np.unique(np.concatenate([all_overflow[channel] for channel in channels]))
+    for channel in channels:
+        all_data[channel] = np.delete(all_data[channel], overflow)
         
+    for i, channel in enumerate(channels):
+        
+        data = all_data[channel]
         entries = len(data)
         bins = []
         vals, counts = np.unique(data, return_counts=True)
+        max_data = vals[-1]
 
         # Fill in missing bins with 0
         full_range = np.arange(max_data)
@@ -42,7 +54,7 @@ def plot_calib(dir, channels):
         bins = np.array(bins) * 1e9
         timestamps = np.cumsum(bins)
         
-        all_data[channel] = data
+        
         all_bins[channel] = bins
         all_timestamps[channel] = timestamps
         
@@ -56,7 +68,7 @@ def plot_calib(dir, channels):
     
     return all_data, all_bins, all_timestamps
 
-def coincidence(timestamps, data, channels):
+def coincidence(timestamps, data, channels, mean):
     
     times = {channel: [] for channel in channels}
     
@@ -67,21 +79,29 @@ def coincidence(timestamps, data, channels):
         timestamps[channel] = np.array(timestamps[channel])
         times[channel] = timestamps[channel][data[channel]]
     
-    times['00'] = times['00'][1:]  
-    times['01'] = times['01'][:-1]
-    times['10'] = times['10'][:-1]
-    times['11'] = times['11'][:-1]
-      
-    mean1 = np.mean([times['00'], times['01']], axis=0)
-    mean2 = np.mean([times['10'], times['11']], axis=0)
-    
-    diff = mean1 - mean2
+    if mean == True:
+        times['00'] = times['00'][1:]  
+        times['01'] = times['01'][:-1]
+        times['10'] = times['10'][:-1]
+        times['11'] = times['11'][:-1]
+        
+        mean1 = np.mean([times['00'], times['01']], axis=0)
+        mean2 = np.mean([times['10'], times['11']], axis=0)
+        
+        diff = mean1 - mean2
+        
+    else:
+        times['00'] = times['00'][1:]  
+        times['01'] = times['01'][:-1]
+        
+        diff = times['00'] - times['01']
+        
     mask = diff < 0
     diff[mask] = diff[mask] + 1/freq * 1e9
     
     mask = diff > 80
     diff[mask] = diff[mask] - 1/freq * 1e9
-    
+
     mask = diff < 3
     diff = diff[mask]
     
@@ -123,7 +143,7 @@ def plot_hist(data):
     
 
 data_, bins_, timestamps_ = plot_calib(timestamp, channels)
-coincidence(timestamps_, data_, channels)
+coincidence(timestamps_, data_, channels, True)
 
 
 
